@@ -1,67 +1,135 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
+import api from '../services/api/client';
+import { useAuth } from '../state/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Role, useAuth } from '../state/AuthContext';
-
-
-const roles: Role[] = ['USER', 'MERCHANT', 'RUNNER', 'ADMIN'];
-
+import { Role } from '../types/role';
 
 export default function Login() {
-const { login } = useAuth();
-const nav = useNavigate();
-const [tab, setTab] = useState<Role>('USER');
-const [username, setUsername] = useState('user1');
-const [password, setPassword] = useState('123456');
-const [error, setError] = useState<string | null>(null);
-const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState<Role>(Role.USER);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
+  const { setUser, setIsAuthenticated } = useAuth();
+  const nav = useNavigate();
 
-const onSubmit = async (e: FormEvent) => {
-e.preventDefault();
-setLoading(true);
-setError(null);
-try {
-await login({ username, password, role: tab });
-// Route to the right dashboard. For now, only user dashboard is implemented.
-if (tab === 'USER') nav('/user/dashboard');
-else nav('/login'); // placeholder – extend for other roles
-} catch (err: any) {
-setError(err?.message || 'Login failed');
-} finally {
-setLoading(false);
+  async function onSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setErr(null);
+  try {
+    setSubmitting(true);
+
+    
+    const url = role === 'ADMIN' ? '/auth/admin/login' : '/auth/login';
+    const res = await api.post(url, { username, password });
+
+    
+    const data = res.data ?? {};
+    const body = data.data ?? data.result ?? data; 
+    let token: string | undefined;
+
+    
+    token =
+      body?.token ||
+      body?.accessToken ||
+      body?.access_token;
+
+   
+    if (!token) {
+      const h = res.headers || {};
+      const authHeader = h['authorization'] || h['Authorization'];
+      if (authHeader && typeof authHeader === 'string') {
+        token = authHeader.replace(/^Bearer\s+/i, '');
+      }
+    }
+
+    
+    if (!token) {
+      
+      token = 'DEV_DUMMY_TOKEN';
+      console.warn('[login] No token from backend; using DEV_DUMMY_TOKEN for UI dev.');
+    }
+    // -------------------------------------------------------------
+
+    localStorage.setItem('access_token', token);
+    const u = { id: body?.id, username: body?.username || username, role: (body?.role as any) ?? role };
+    localStorage.setItem('user', JSON.stringify(u));
+    localStorage.setItem('isAuthenticated', 'true');
+
+    setUser(u);
+    setIsAuthenticated(true);
+
+    
+    nav('/user/notifications', { replace: true });
+  } catch (e: any) {
+    setErr(e?.response?.data?.message || e.message || 'Login failed');
+  } finally {
+    setSubmitting(false);
+  }
 }
-};
 
+  return (
+    <div className="page-center">
+      <form className="card" onSubmit={onSubmit}>
+        <h1 className="title" style={{marginBottom: 8}}>CampusGo Login</h1>
 
-return (
-<div className="auth">
-<h1>CampusGo Login</h1>
+        
+        <div style={{marginBottom: 16}}>
+          <div className="tabs">
+            {(['USER','MERCHANT','RUNNER','ADMIN'] as Role[]).map(r => (
+              <div
+                key={r}
+                className={`tab ${role === r ? 'active' : ''}`}
+                onClick={() => setRole(r)}
+              >
+                {r}
+              </div>
+            ))}
+          </div>
+        </div>
 
+        <div className="field">
+          <label className="label">Username</label>
+          <input
+            className="input"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="e.g. Alice"
+            required
+          />
+        </div>
 
-<div className="tabs">
-{roles.map((r) => (
-<button key={r} className={r === tab ? 'active' : ''} onClick={() => setTab(r)}>
-{r}
-</button>
-))}
-</div>
+        <div className="field">
+          <label className="label">Password</label>
+          <input
+            className="input"
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+        </div>
 
+        {err && <div className="error">{err}</div>}
 
-<form onSubmit={onSubmit} className="card">
-<label>
-Username
-<input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-</label>
-<label>
-Password
-<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" />
-</label>
-<button type="submit" disabled={loading}>{loading ? 'Signing in…' : `Sign in as ${tab}`}</button>
-{error && <p className="error">{error}</p>}
-</form>
+        <div style={{marginTop: 12, display: 'flex', gap: 10}}>
+          <button className="btn" type="submit" disabled={submitting}>
+            {submitting ? 'Signing in…' : `Sign in as ${role}`}
+          </button>
+          <button
+            className="btn btn-outline"
+            type="button"
+            onClick={() => { setUsername(''); setPassword(''); setErr(null); }}
+          >
+            Clear
+          </button>
+        </div>
 
-
-<p className="hint">Gateways used: /api/auth/login, /api/auth/admin/login via Vite proxy → http://localhost:8080</p>
-</div>
-);
+        <div className="muted" style={{marginTop: 12, fontSize: 13}}>
+          Gateways used: /api/auth/login, /api/auth/admin/login via Vite proxy → http://localhost:8080
+        </div>
+      </form>
+    </div>
+  );
 }
