@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../services/api/client';
+import { authService } from '../lib/authService';
 import { useAuth } from '../state/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Role } from '../types/role';
@@ -8,8 +9,11 @@ export default function Login() {
   const [role, setRole] = useState<Role>(Role.USER);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const { setUser, setIsAuthenticated } = useAuth();
   const nav = useNavigate();
@@ -69,10 +73,29 @@ export default function Login() {
   }
 }
 
+  async function onRegister() {
+    setErr(null);
+    setSuccess(null);
+    if (!username || !password) {
+      setErr('Username and password are required for registration');
+      return;
+    }
+    try {
+      setRegistering(true);
+      await authService.register(username, password, phone || undefined);
+      setSuccess('Registration successful. Please sign in.');
+      setPassword('');
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e.message || 'Registration failed');
+    } finally {
+      setRegistering(false);
+    }
+  }
+
   return (
     <div className="page-center">
       <form className="card" onSubmit={onSubmit}>
-        <h1 className="title" style={{marginBottom: 8}}>CampusGo Login</h1>
+        <h1 className="title" style={{marginBottom: 8}}>CampusGo</h1>
 
         
         <div style={{marginBottom: 16}}>
@@ -111,7 +134,18 @@ export default function Login() {
           />
         </div>
 
+        <div className="field">
+          <label className="label">Phone (optional)</label>
+          <input
+            className="input"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            placeholder="e.g. +6591234567"
+          />
+        </div>
+
         {err && <div className="error">{err}</div>}
+        {success && <div className="success">{success}</div>}
 
         <div style={{marginTop: 12, display: 'flex', gap: 10}}>
           <button className="btn" type="submit" disabled={submitting}>
@@ -123,6 +157,14 @@ export default function Login() {
             onClick={() => { setUsername(''); setPassword(''); setErr(null); }}
           >
             Clear
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={onRegister}
+            disabled={registering}
+          >
+            {registering ? 'Registering…' : `Register as ${role}`}
           </button>
         </div>
 
