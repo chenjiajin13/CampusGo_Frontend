@@ -5,6 +5,20 @@ import { useAuth } from '../state/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Role } from '../types/role';
 
+function loginPathByRole(role: Role): string {
+  if (role === Role.ADMIN) return '/auth/admin/login';
+  if (role === Role.MERCHANT) return '/auth/merchant/login';
+  if (role === Role.RUNNER) return '/auth/runner/login';
+  return '/auth/login';
+}
+
+function profilePathByRole(role: Role): string {
+  if (role === Role.ADMIN) return '/admins/me';
+  if (role === Role.MERCHANT) return '/merchants/me';
+  if (role === Role.RUNNER) return '/runners/me';
+  return '/users/me';
+}
+
 export default function Login() {
   const [role, setRole] = useState<Role>(Role.USER);
   const [username, setUsername] = useState('');
@@ -19,59 +33,47 @@ export default function Login() {
   const nav = useNavigate();
 
   async function onSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setErr(null);
-  try {
-    setSubmitting(true);
+    e.preventDefault();
+    setErr(null);
+    try {
+      setSubmitting(true);
 
-    
-    const url = role === 'ADMIN' ? '/auth/admin/login' : '/auth/login';
-    const res = await api.post(url, { username, password });
+      const res = await api.post(loginPathByRole(role), { username, password });
+      const data = res.data ?? {};
+      const body = data.data ?? data.result ?? data;
 
-    
-    const data = res.data ?? {};
-    const body = data.data ?? data.result ?? data; 
-    let token: string | undefined;
+      const token = body?.accessToken || body?.token || body?.access_token;
+      const refreshToken = body?.refreshToken || body?.refresh_token;
+      if (!token) throw new Error('Login response does not contain access token');
 
-    
-    token =
-      body?.token ||
-      body?.accessToken ||
-      body?.access_token;
+      localStorage.setItem('access_token', token);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
 
-   
-    if (!token) {
-      const h = res.headers || {};
-      const authHeader = h['authorization'] || h['Authorization'];
-      if (authHeader && typeof authHeader === 'string') {
-        token = authHeader.replace(/^Bearer\s+/i, '');
+      let userId: number | undefined;
+      let usernameFromProfile: string | undefined;
+      try {
+        const profileRes = await api.get(profilePathByRole(role));
+        const profile = profileRes.data?.data ?? profileRes.data;
+        if (profile?.id != null) userId = Number(profile.id);
+        if (profile?.username) usernameFromProfile = String(profile.username);
+      } catch {
+        // Keep login successful even if profile lookup fails.
       }
+
+      const u = { id: userId, username: usernameFromProfile || username, role };
+      localStorage.setItem('user', JSON.stringify(u));
+      localStorage.setItem('isAuthenticated', 'true');
+
+      setUser(u);
+      setIsAuthenticated(true);
+
+      nav('/user/notifications', { replace: true });
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e.message || 'Login failed');
+    } finally {
+      setSubmitting(false);
     }
-
-    
-    if (!token) {
-      
-      token = 'DEV_DUMMY_TOKEN';
-      console.warn('[login] No token from backend; using DEV_DUMMY_TOKEN for UI dev.');
-    }
-    // -------------------------------------------------------------
-
-    localStorage.setItem('access_token', token);
-    const u = { id: body?.id, username: body?.username || username, role: (body?.role as any) ?? role };
-    localStorage.setItem('user', JSON.stringify(u));
-    localStorage.setItem('isAuthenticated', 'true');
-
-    setUser(u);
-    setIsAuthenticated(true);
-
-    
-    nav('/user/notifications', { replace: true });
-  } catch (e: any) {
-    setErr(e?.response?.data?.message || e.message || 'Login failed');
-  } finally {
-    setSubmitting(false);
   }
-}
 
   async function onRegister() {
     setErr(null);
@@ -95,12 +97,11 @@ export default function Login() {
   return (
     <div className="page-center">
       <form className="card" onSubmit={onSubmit}>
-        <h1 className="title" style={{marginBottom: 8}}>CampusGo</h1>
+        <h1 className="title" style={{ marginBottom: 8 }}>CampusGo</h1>
 
-        
-        <div style={{marginBottom: 16}}>
+        <div style={{ marginBottom: 16 }}>
           <div className="tabs">
-            {(['USER','MERCHANT','RUNNER','ADMIN'] as Role[]).map(r => (
+            {(['USER', 'MERCHANT', 'RUNNER', 'ADMIN'] as Role[]).map((r) => (
               <div
                 key={r}
                 className={`tab ${role === r ? 'active' : ''}`}
@@ -117,7 +118,7 @@ export default function Login() {
           <input
             className="input"
             value={username}
-            onChange={e => setUsername(e.target.value)}
+            onChange={(e) => setUsername(e.target.value)}
             placeholder="e.g. Alice"
             required
           />
@@ -129,7 +130,7 @@ export default function Login() {
             className="input"
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
@@ -139,7 +140,7 @@ export default function Login() {
           <input
             className="input"
             value={phone}
-            onChange={e => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value)}
             placeholder="e.g. +6591234567"
           />
         </div>
@@ -147,14 +148,18 @@ export default function Login() {
         {err && <div className="error">{err}</div>}
         {success && <div className="success">{success}</div>}
 
-        <div style={{marginTop: 12, display: 'flex', gap: 10}}>
+        <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
           <button className="btn" type="submit" disabled={submitting}>
-            {submitting ? 'Signing in…' : `Sign in as ${role}`}
+            {submitting ? 'Signing in...' : `Sign in as ${role}`}
           </button>
           <button
             className="btn btn-outline"
             type="button"
-            onClick={() => { setUsername(''); setPassword(''); setErr(null); }}
+            onClick={() => {
+              setUsername('');
+              setPassword('');
+              setErr(null);
+            }}
           >
             Clear
           </button>
@@ -164,12 +169,12 @@ export default function Login() {
             onClick={onRegister}
             disabled={registering}
           >
-            {registering ? 'Registering…' : `Register as ${role}`}
+            {registering ? 'Registering...' : 'Register'}
           </button>
         </div>
 
-        <div className="muted" style={{marginTop: 12, fontSize: 13}}>
-          Gateways used: /api/auth/login, /api/auth/admin/login via Vite proxy → http://localhost:8080
+        <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+          Gateway target: http://localhost:8080 via Vite proxy /api
         </div>
       </form>
     </div>

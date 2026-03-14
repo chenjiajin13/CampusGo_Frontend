@@ -1,63 +1,73 @@
-/**
- * 商家服务 API 客户端
- */
 import api from '../services/api/client'
 import {
   MerchantDTO,
   MerchantCreateRequest,
   MerchantUpdateRequest,
-  UpdateStatusRequest,
+  MenuItemDTO,
+  MenuItemUpsertRequest,
 } from '@/types/api'
 
 export const merchantService = {
-  /**
-   * 列出所有商家 (支持搜索)
-   */
   async listMerchants(keyword?: string): Promise<MerchantDTO[]> {
     const params = keyword ? { q: keyword } : {}
-    const response = await api.get<MerchantDTO[]>('/api/merchants', { params })
+    const response = await api.get<MerchantDTO[]>('/merchants', { params })
     return response.data
   },
 
-  /**
-   * 获取商家详情
-   */
   async getMerchant(id: number): Promise<MerchantDTO> {
-    const response = await api.get<MerchantDTO>(`/api/merchants/${id}`)
+    const response = await api.get<MerchantDTO>(`/merchants/${id}`)
     return response.data
   },
 
-  /**
-   * 创建商家
-   */
+  async getMe(): Promise<MerchantDTO> {
+    const response = await api.get<MerchantDTO>('/merchants/me')
+    return response.data
+  },
+
+  async getMerchantMenu(id: number): Promise<MenuItemDTO[]> {
+    const response = await api.get<MenuItemDTO[]>(`/merchants/${id}/menu`)
+    return response.data
+  },
+
+  async addMenuItem(merchantId: number, req: MenuItemUpsertRequest): Promise<MenuItemDTO> {
+    const response = await api.post<MenuItemDTO>(`/merchants/${merchantId}/menu`, req)
+    return response.data
+  },
+
+  async updateMenuItem(merchantId: number, itemId: number, req: MenuItemUpsertRequest): Promise<MenuItemDTO> {
+    const response = await api.put<MenuItemDTO>(`/merchants/${merchantId}/menu/${itemId}`, req)
+    return response.data
+  },
+
+  async deleteMenuItem(merchantId: number, itemId: number): Promise<void> {
+    await api.delete(`/merchants/${merchantId}/menu/${itemId}`)
+  },
+
   async createMerchant(req: MerchantCreateRequest): Promise<MerchantDTO> {
-    const response = await api.post<MerchantDTO>('/api/merchants', req)
+    const response = await api.post<MerchantDTO>('/merchants', req)
     return response.data
   },
 
-  /**
-   * 更新商家基本信息
-   */
   async updateMerchant(id: number, req: MerchantUpdateRequest): Promise<MerchantDTO> {
-    const response = await api.put<MerchantDTO>(`/api/merchants/${id}`, req)
+    const response = await api.put<MerchantDTO>(`/merchants/${id}`, req)
     return response.data
   },
 
-  /**
-   * 更新商家状态
-   */
+  async updateMe(req: MerchantUpdateRequest): Promise<MerchantDTO> {
+    const response = await api.put<MerchantDTO>('/merchants/me', req)
+    return response.data
+  },
+
+  async updateMyPassword(newPassword: string): Promise<void> {
+    await api.put('/merchants/me/password', { newPassword })
+  },
+
   async updateMerchantStatus(id: number, status: string): Promise<MerchantDTO> {
-    const response = await api.patch<MerchantDTO>(
-      `/api/merchants/${id}/status`,
-      { status }
-    )
+    const response = await api.patch<MerchantDTO>(`/merchants/${id}/status`, { status })
     return response.data
   },
 
-  /**
-   * 删除商家
-   */
   async deleteMerchant(id: number): Promise<void> {
-    await api.delete(`/api/merchants/${id}`)
+    await api.delete(`/merchants/${id}`)
   },
 }

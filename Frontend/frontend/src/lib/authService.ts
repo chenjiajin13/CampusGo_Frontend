@@ -27,7 +27,7 @@ export const authService = {
   },
 
   /**
-   * 管理员登录
+   * admin login
    */
   async adminLogin(username: string, password: string): Promise<TokenPairResponse> {
     const response = await api.post<TokenPairResponse>('/auth/admin/login', {

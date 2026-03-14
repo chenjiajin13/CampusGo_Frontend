@@ -1,16 +1,11 @@
-/**
- * 根据后端 CampusGo API 定义的类型
- */
-
-// 认证相关
 export interface LoginRequest {
   username: string
   password: string
 }
 
 export interface TokenPairResponse {
-  token: string
-  expiresAt: number
+  accessToken: string
+  accessExpiresAt: number
   refreshToken: string
   refreshExpiresAt: number
 }
@@ -22,16 +17,15 @@ export interface UserAuthDTO {
   enabled: boolean
 }
 
-// 用户相关
 export interface UserDTO {
   id: number
   username: string
   email?: string
   phone?: string
-  enabled: boolean
+  address?: string
+  enabled?: boolean
 }
 
-// 商家相关
 export interface MerchantDTO {
   id: number
   name: string
@@ -43,6 +37,20 @@ export interface MerchantDTO {
   rating?: number
   finishedOrders?: number
   tags?: string[]
+}
+
+export interface MenuItemDTO {
+  id: number
+  merchantId: number
+  name: string
+  priceCents: number
+  enabled: boolean
+}
+
+export interface MenuItemUpsertRequest {
+  name: string
+  priceCents: number
+  enabled?: boolean
 }
 
 export interface MerchantCreateRequest {
@@ -65,11 +73,11 @@ export interface MerchantUpdateRequest {
   tags?: string[]
 }
 
-// 配送员相关
 export enum VehicleType {
-  BIKE = 'BIKE',
-  CAR = 'CAR',
-  ELECTRIC = 'ELECTRIC'
+  FOOT = 'FOOT',
+  BICYCLE = 'BICYCLE',
+  E_SCOOTER = 'E_SCOOTER',
+  MOTORBIKE = 'MOTORBIKE',
 }
 
 export interface RunnerDTO {
@@ -95,44 +103,129 @@ export interface RunnerUpdateRequest {
   vehicleType?: VehicleType
 }
 
-export interface UpdateLocationRequest {
-  latitude: number
-  longitude: number
-}
-
-// 订单相关
 export interface OrderDTO {
-  id: number
-  userId: number
-  merchantId: number
+  id?: number
+  orderId?: number
+  userId?: number
+  merchantId?: number
   status: string
-  items?: OrderItem[]
-  totalPrice: number
-  address: string
-  createdAt: string
+  createdAt?: string
 }
 
-export interface OrderItem {
-  id: number
-  productName: string
+export interface OrderDetailDTO {
+  orderId: number
+  userId?: number
+  merchantId?: number
+  runnerId?: number | null
+  user?: UserDTO
+  customerName?: string
+  customerPhone?: string
+  customerAddress?: string
+  status: string
+  amountCents?: number
+  paymentStatus?: string | null
+  runnerCanComplete?: boolean
+}
+
+export interface BatchCheckoutItemDTO {
+  orderId: number
+  merchantId: number
+  runnerId?: number | null
+  orderStatus: string
+  amountCents: number
+  paymentStatus?: string | null
+}
+
+export interface BatchCheckoutResponse {
+  orderCount: number
+  totalAmountCents: number
+  allPaid: boolean
+  orders: BatchCheckoutItemDTO[]
+}
+
+export interface CartItemRequest {
+  merchantId: number
+  menuItemId: number
   quantity: number
-  price: number
 }
 
-// 支付相关
+export interface CartItemDTO {
+  merchantId?: number | null
+  menuItemId: number
+  name: string
+  unitPriceCents: number
+  quantity: number
+  subtotalCents: number
+}
+
+export interface CartSummaryDTO {
+  merchantId: number | null
+  items: CartItemDTO[]
+  totalQuantity: number
+  totalCents: number
+}
+
+export interface QuickOrderRequest {
+  merchantId: number
+  address?: string
+  autoPay?: boolean
+  items: CartItemRequest[]
+}
+
 export enum PaymentStatus {
   PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED'
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
 }
 
 export interface PaymentDTO {
   id: number
   orderId: number
-  amount: number
+  userId?: number
+  merchantId?: number
+  amountCents: number
+  currency?: string
   status: PaymentStatus
   method?: string
-  createdAt: string
+  createdAt?: string
+}
+
+export enum WalletOwnerType {
+  USER = 'USER',
+  MERCHANT = 'MERCHANT',
+  RUNNER = 'RUNNER',
+}
+
+export enum WalletDirection {
+  DEBIT = 'DEBIT',
+  CREDIT = 'CREDIT',
+}
+
+export enum WalletBizType {
+  TOPUP = 'TOPUP',
+  PAY_ORDER = 'PAY_ORDER',
+  REFUND = 'REFUND',
+  SETTLE_MERCHANT = 'SETTLE_MERCHANT',
+  SETTLE_RUNNER = 'SETTLE_RUNNER',
+  ADJUST = 'ADJUST',
+}
+
+export interface WalletAccountDTO {
+  ownerType: WalletOwnerType
+  ownerId: number
+  balanceCents: number
+  frozenCents: number
+}
+
+export interface WalletTransactionDTO {
+  id: number
+  bizType: WalletBizType
+  direction: WalletDirection
+  amountCents: number
+  orderId?: number | null
+  remark?: string | null
+  createdAt?: string
 }
 
 export interface UpdateStatusRequest {
@@ -140,11 +233,10 @@ export interface UpdateStatusRequest {
   enabled?: boolean
 }
 
-// 通知相关
 export enum NotificationTargetType {
   USER = 'USER',
   MERCHANT = 'MERCHANT',
-  RUNNER = 'RUNNER'
+  RUNNER = 'RUNNER',
 }
 
 export interface NotificationDTO {
@@ -168,17 +260,15 @@ export interface NotificationCreateRequest {
   data?: any
 }
 
-// 响应包装类型
 export interface ApiResponse<T> {
   code: number
   message: string
   data: T
 }
 
-// 管理员相关
 export enum AdminRole {
   ADMIN = 'ADMIN',
-  OPERATOR = 'OPERATOR'
+  OPERATOR = 'OPERATOR',
 }
 
 export interface AdminDTO {
@@ -197,3 +287,25 @@ export interface AdminCreateRequest {
   phone: string
   role?: AdminRole
 }
+export interface MerchantDailyRevenueDTO {
+  day: string
+  amountCents: number
+}
+
+export interface MerchantItemShareDTO {
+  itemName: string
+  quantity: number
+  amountCents: number
+}
+
+export interface MerchantAnalyticsDTO {
+  weekStart: string
+  weekEnd: string
+  selectedWeekRevenueCents: number
+  lifetimeRevenueCents: number
+  annualRevenueCents: number
+  completedOrderCount: number
+  dailyRevenue: MerchantDailyRevenueDTO[]
+  itemShare: MerchantItemShareDTO[]
+}
+

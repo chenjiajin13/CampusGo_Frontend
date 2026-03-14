@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Role } from '../types/role';
 
 export type User = { id?: any; username?: string; role?: Role } | null;
@@ -21,13 +21,22 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+function hasUsableToken(): boolean {
+  const token = (localStorage.getItem('access_token') || '').trim();
+  if (!token) return false;
+  const parts = token.split('.');
+  return parts.length === 3 && parts.every((p) => p.length > 0);
+}
+
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<User>(() => {
-    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
+    try {
+      return JSON.parse(localStorage.getItem('user') || 'null');
+    } catch {
+      return null;
+    }
   });
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    () => localStorage.getItem('isAuthenticated') === 'true'
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => hasUsableToken());
 
   const login = (u: User, token?: string) => {
     setUser(u);
@@ -43,7 +52,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     localStorage.removeItem('user');
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   };
+
+  useEffect(() => {
+    const onAuthInvalid = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+    window.addEventListener('campusgo:auth-invalid', onAuthInvalid);
+    return () => window.removeEventListener('campusgo:auth-invalid', onAuthInvalid);
+  }, []);
 
   const value = useMemo(
     () => ({ user, isAuthenticated, setUser, setIsAuthenticated, login, logout }),
